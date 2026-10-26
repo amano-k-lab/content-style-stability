@@ -126,8 +126,7 @@ for dataset in imagenet imagenet_stylized model_vs_human; do
 done
 ```
 
-Pruning masks remain active during fine-tuning. Repeat this procedure for all
-110 checkpoints produced from each base model.
+Pruning masks remain active during fine-tuning. Repeat this procedure for all 110 checkpoints produced from each base model.
 
 ## 3. Synthesize images from CSS and SSS submodels
 
@@ -157,11 +156,7 @@ uv run content-style-stability-screening lpips \
   --styles-per-condition 5
 ```
 
-The manifest records content-correlation and high-frequency artifact metrics for
-audit but does not apply automatic QC by default. Add `--auto-qc` to enable
-content-correlation screening, and additionally pass
-`--screen-high-frequency-artifacts` to enable the RGB-neighbor,
-high-frequency-residual, and neighbor-correlation warnings.
+The manifest records content-correlation and high-frequency artifact metrics for audit but does not apply automatic QC by default. Add `--auto-qc` to enable content-correlation screening, and additionally pass `--screen-high-frequency-artifacts` to enable the RGB-neighbor, high-frequency-residual, and neighbor-correlation warnings.
 
 LPIPS-Alex selects five CSS styles and five SSS styles (10 in total), with no style shared between the two conditions. The selected images and the behavioral-experiment input `behavior_trials.csv` are written below `$mass_run_dir/screening/lpips/`.
 
@@ -179,12 +174,7 @@ uv run python -m experiment.run_style_reflection_experiment \
   --session-id "<session-id>"
 ```
 
-The default configuration reproduces the `proj_metamer_cornet` protocol: it
-uses the calibrated display-gamma profile, a 5 cm stimulus frame, a 1000 ms
-stimulus duration, a 500 ms response-to-next-trial ITI, and the legacy seeded
-trial/side randomization. Use `--no-display-gamma` only when the experimental
-monitor has not been calibrated with that profile. The experiment presents 500
-trials and saves responses below `experiment/results/runs/behavior_experiment/`.
+The default configuration reproduces the `proj_metamer_cornet` protocol: it uses the calibrated display-gamma profile, a 5 cm stimulus frame, a 1000 ms stimulus duration, a 500 ms response-to-next-trial ITI, and the legacy seeded trial/side randomization. Use `--no-display-gamma` only when the experimental monitor has not been calibrated with that profile. The experiment presents 500 trials and saves responses below `experiment/results/runs/behavior_experiment/`.
 
 ## 5. Analysis
 
@@ -199,14 +189,11 @@ uv run content-style-stability-figure-behavior \
   --analysis-run "$analysis_run"
 ```
 
-Analysis outputs are saved below `experiment/results/runs/behavior_analysis/`;
-PDF figures are saved below `experiment/results/runs/behavior_figures/`. Add
-`--png` and/or `--svg` to create those formats as well.
+Analysis outputs are saved below `experiment/results/runs/behavior_analysis/`; PDF figures are saved below `experiment/results/runs/behavior_figures/`. Add `--png` and/or `--svg` to create those formats as well.
 
 ### Model evaluations and figures
 
-Analyze the sample-level prediction tables produced in step 2, then create the
-pruning-curve and normalized-AUC figures:
+Analyze the sample-level prediction tables produced in step 2, then create the pruning-curve and normalized-AUC figures:
 
 ```bash
 evaluation_root="results/runs/evaluate"
@@ -218,15 +205,9 @@ uv run content-style-stability-figure-model-evaluation \
   --analysis-run "$model_analysis_run"
 ```
 
-The analysis uses 1,000 shared bootstrap resamples by default. PDF figures are
-written below `results/runs/model_evaluation_figures/`; add `--png` and/or
-`--svg` for additional formats. When both pre- and post-fine-tuning evaluation
-grids are available, the figure run also writes the architecture-specific
-6-by-4 pruning-curve grids used for Appendix Figures 9--12 (AlexNet, VGG-19,
-ResNet-50, and CORnet-S).
+The analysis uses 1,000 shared bootstrap resamples by default. PDF figures are written below `results/runs/model_evaluation_figures/`; add `--png` and/or `--svg` for additional formats. When both pre- and post-fine-tuning evaluation grids are available, the figure run also writes the architecture-specific 6-by-4 pruning-curve grids used for Appendix Figures 9--12 (AlexNet, VGG-19, ResNet-50, and CORnet-S).
 
-For prediction tables created by the previous project, first create a canonical
-copy and pass the printed run directory to the analysis command:
+For prediction tables created by the previous project, first create a canonical copy and pass the printed run directory to the analysis command:
 
 ```bash
 evaluation_root="$(uv run content-style-stability-convert-model-evaluation \
@@ -235,9 +216,7 @@ evaluation_root="$(uv run content-style-stability-convert-model-evaluation \
 
 ### Exclusive-channel stability distributions
 
-For the VGG-19 submodels used in synthesis, compare the CSS and SSS
-distributions of channels retained exclusively by the 30% CSS-average and
-SSS-minimum checkpoints:
+For the VGG-19 submodels used in synthesis, compare the CSS and SSS distributions of channels retained exclusively by the 30% CSS-average and SSS-minimum checkpoints:
 
 ```bash
 exclusive_analysis_run="$(uv run content-style-stability-analyze-exclusive-channels \
@@ -250,12 +229,11 @@ uv run content-style-stability-figure-exclusive-channels \
   --analysis-run "$exclusive_analysis_run"
 ```
 
-The analysis aggregates CSS with the mean and SSS with the minimum, matching
-the selected submodels. It uses 200 stimulus-group bootstrap replicates by
-default. Within each score type, every replicate shares the same resampled
-groups across the CSS-exclusive and SSS-exclusive channel sets. CSV artifacts
-are written below `results/runs/exclusive_channel_analysis/`, and the ECDF PDF
-is written below `results/runs/exclusive_channel_figures/`.
+The analysis aggregates CSS with the mean and SSS with the minimum, matching the selected submodels. It uses 200 stimulus-group bootstrap replicates by default. Within each score type, every replicate shares the same resampled groups across the CSS-exclusive and SSS-exclusive channel sets. CSV artifacts are written below `results/runs/exclusive_channel_analysis/`, and the ECDF PDF is written below `results/runs/exclusive_channel_figures/`.
+
+## 6. Behavioral-response data
+
+The de-identified main-study responses are available in [`experiment/data/responses.csv`](experiment/data/responses.csv). The table contains 5,000 trials from 10 participants (500 trials per participant). Participant, content, style, and condition identifiers were replaced with release-specific identifiers.
 
 ## References
 
