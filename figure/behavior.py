@@ -73,7 +73,11 @@ def make_behavior_figures(
     started = datetime.now(UTC)
     run_id = uuid4().hex[:8]
     run_root = create_run_directory(
-        "behavior_figures", results_root=results_root, run_id=run_id, timestamp=started
+        "behavior_figures",
+        results_root=results_root,
+        run_id=run_id,
+        timestamp=started,
+        lightweight_kind="figures",
     )
     log_path = run_root / "run.log"
     _append_log_line(log_path, "INFO", "starting behavior figure generation")
