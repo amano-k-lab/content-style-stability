@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from content_style_stability.cli import evaluate, train
+from content_style_stability.config.defaults import DEFAULT_SAVE_EVERY_N_EPOCHS
 
 
 def test_train_parser_is_dataset_oriented() -> None:
@@ -12,6 +13,7 @@ def test_train_parser_is_dataset_oriented() -> None:
     )
     assert args.models == ["alexnet", "vgg19"]
     assert args.dataset == "imagenet"
+    assert args.save_every_n_epochs == DEFAULT_SAVE_EVERY_N_EPOCHS == 1
 
 
 def test_epoch_evaluation_requires_stylized_imagenet_training() -> None:
@@ -82,6 +84,22 @@ def test_train_main_resolves_epoch_validation_datasets(
     assert request.trainer_kwargs["selection_dataset"] == (
         "imagenet_stylized_train_val"
     )
+    resolved_training = dict(request.trainer_kwargs)
+    resolved_training.pop("validation_data_paths")
+    resolved_training.pop("selection_dataset")
+    assert resolved_training == {
+        "epochs": 50,
+        "batch_size": 256,
+        "num_workers": 16,
+        "lr": 0.001,
+        "momentum": 0.9,
+        "weight_decay": 0.0001,
+        "lr_scheduler": "none",
+        "lr_step_size": 30,
+        "lr_gamma": 0.1,
+        "amp": False,
+        "save_every_n_epochs": 1,
+    }
     assert request.model_output_root == tmp_path / "models" / "train"
 
 
