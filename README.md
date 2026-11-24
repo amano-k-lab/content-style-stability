@@ -63,11 +63,11 @@ This command prepares WikiArt, Stylized ImageNet, ContentConstantDataset, and St
 
 ### Fine-tune the base models
 
-Fine-tune the ImageNet-pretrained models on Stylized ImageNet for 50 epochs:
+Fine-tune the ImageNet-pretrained model on Stylized ImageNet for 50 epochs:
 
 ```bash
 uv run content-style-stability-train \
-  --model vgg19 alexnet resnet50 \
+  --model vgg19 \
   --dataset imagenet_stylized \
   --epochs 50 \
   --evaluate-each-epoch
@@ -106,27 +106,33 @@ This creates 11 pruning rates for each of the five CSS and five SSS aggregation 
 
 ### Fine-tune and evaluate the submodels
 
-Repeat the following commands for every checkpoint listed in the pruning run's
+Fine-tune every checkpoint listed in the pruning run's `results.csv` for one
+epoch:
+
+```bash
+prune_results="results/runs/prune/REPLACE_WITH_RUN_ID/results.csv"
+
+uv run content-style-stability-train \
+  --models-from-results "$prune_results" \
+  --dataset imagenet \
+  --epochs 1
+```
+
+Then evaluate all fine-tuned checkpoints reported by the training run's
 `results.csv`:
 
 ```bash
-pruned_checkpoint="REPLACE_WITH_PRUNED_CHECKPOINT_PATH"
-
-uv run content-style-stability-train \
-  --model "$pruned_checkpoint" \
-  --dataset imagenet \
-  --epochs 1
-
-submodel_checkpoint="REPLACE_WITH_FINE_TUNED_CHECKPOINT_PATH"
+train_results="results/runs/train/REPLACE_WITH_RUN_ID/results.csv"
 
 for dataset in imagenet imagenet_stylized model_vs_human; do
   uv run content-style-stability-evaluate \
-    --model "$submodel_checkpoint" \
+    --models-from-results "$train_results" \
     --dataset "$dataset"
 done
 ```
 
-Pruning masks remain active during fine-tuning. Repeat this procedure for all 110 checkpoints produced from each base model.
+Pruning masks remain active during fine-tuning. The training command processes
+the 110 checkpoints serially in their pruning-results order.
 
 ## 3. Synthesize images from CSS and SSS submodels
 
