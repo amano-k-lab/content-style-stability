@@ -21,6 +21,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from content_style_stability.models.vgg19 import VGG19_CONV_LAYER_NAMES
 from content_style_stability.utils.io import (
     _append_log_line,
     _build_error_record,
@@ -41,6 +42,7 @@ REQUIRED_ANALYSIS_FILES = (
     "exclusive_channel_counts.csv",
 )
 CHANNEL_COLORS = {"css_exclusive": "#2166AC", "sss_exclusive": "#D6604D"}
+SHARED_COLOR = "#BDBDBD"
 CHANNEL_LABELS = {
     "css_exclusive": "CSS-exclusive channels",
     "sss_exclusive": "SSS-exclusive channels",
@@ -65,7 +67,7 @@ def make_exclusive_channel_figures(
     include_png: bool = False,
     include_svg: bool = False,
 ) -> ExclusiveChannelFigureResult:
-    """Render the two-panel CSS/SSS ECDF as PDF and optional PNG/SVG files."""
+    """Render layer-mask and CSS/SSS ECDF figures as PDF and optional copies."""
 
     if dpi <= 0:
         raise ValueError("dpi must be > 0")
@@ -78,6 +80,7 @@ def make_exclusive_channel_figures(
         results_root=results_root,
         run_id=run_id,
         timestamp=started,
+        lightweight_kind="figures",
     )
     log_path = run_root / "run.log"
     _append_log_line(log_path, "INFO", "starting exclusive-channel figures")
@@ -91,17 +94,20 @@ def make_exclusive_channel_figures(
     try:
         scores = pd.read_csv(analysis_run / "exclusive_channel_scores.csv")
         summary = pd.read_csv(analysis_run / "exclusive_channel_summary.csv")
-        _validate_tables(scores, summary)
-        figure = _draw_ecdf(scores, summary)
-        for suffix in formats:
-            path = run_root / f"exclusive_channel_ecdf.{suffix}"
-            kwargs = {"dpi": dpi} if suffix == "png" else {}
-            figure.savefig(path, bbox_inches="tight", facecolor="white", **kwargs)
-            figure_paths.append(path)
-            outputs.append(
-                _output_record(f"exclusive_channel_ecdf_{suffix}", path, suffix)
-            )
-        plt.close(figure)
+        counts = pd.read_csv(analysis_run / "exclusive_channel_counts.csv")
+        _validate_tables(scores, summary, counts)
+        figures = (
+            ("exclusive_channel_masks", _draw_layer_masks(counts)),
+            ("exclusive_channel_ecdf", _draw_ecdf(scores, summary)),
+        )
+        for stem, figure in figures:
+            for suffix in formats:
+                path = run_root / f"{stem}.{suffix}"
+                kwargs = {"dpi": dpi} if suffix == "png" else {}
+                figure.savefig(path, bbox_inches="tight", facecolor="white", **kwargs)
+                figure_paths.append(path)
+                outputs.append(_output_record(f"{stem}_{suffix}", path, suffix))
+            plt.close(figure)
         metadata_path = run_root / "figure_metadata.json"
         write_json(
             metadata_path,
@@ -111,7 +117,7 @@ def make_exclusive_channel_figures(
                 "source_csvs": [
                     str(analysis_run / filename) for filename in REQUIRED_ANALYSIS_FILES
                 ],
-                "figures": ["exclusive_channel_ecdf"],
+                "figures": ["exclusive_channel_masks", "exclusive_channel_ecdf"],
                 "formats": list(formats),
                 "dpi": dpi,
             },
@@ -159,13 +165,62 @@ def make_exclusive_channel_figures(
                 }
             ],
             "outputs": outputs,
-            "metrics": {"figure_count": 1 if status == "success" else 0},
+            "metrics": {"figure_count": 2 if status == "success" else 0},
             "errors": errors,
         },
         run_root / "run.json",
         overwrite=True,
     )
     return ExclusiveChannelFigureResult(run_root, status, tuple(figure_paths))
+
+
+def _draw_layer_masks(counts: pd.DataFrame) -> plt.Figure:
+    ordered = counts.set_index("layer").loc[list(VGG19_CONV_LAYER_NAMES)]
+    x = np.arange(len(ordered), dtype=float)
+    shared = ordered["shared_count"].to_numpy(dtype=float)
+    css_exclusive = ordered["css_exclusive_count"].to_numpy(dtype=float)
+    sss_exclusive = ordered["sss_exclusive_count"].to_numpy(dtype=float)
+    retained = ordered["css_kept_count"].to_numpy(dtype=float)
+
+    fig, axis = plt.subplots(figsize=(10.2, 4.5))
+    axis.bar(x, shared, color=SHARED_COLOR, label="Shared")
+    axis.bar(
+        x,
+        css_exclusive,
+        bottom=shared,
+        color=CHANNEL_COLORS["css_exclusive"],
+        label=CHANNEL_LABELS["css_exclusive"],
+    )
+    axis.bar(
+        x,
+        sss_exclusive,
+        bottom=shared + css_exclusive,
+        color=CHANNEL_COLORS["sss_exclusive"],
+        label=CHANNEL_LABELS["sss_exclusive"],
+    )
+    axis.plot(
+        x,
+        retained,
+        color="black",
+        marker="o",
+        markersize=3.2,
+        linewidth=1.4,
+        label="Retained per submodel before overlap removal",
+    )
+    axis.set_xticks(x, ordered.index, rotation=45, ha="right")
+    axis.set_xlabel("VGG-19 convolutional layer")
+    axis.set_ylabel("Number of retained channels")
+    axis.set_xlim(-0.6, len(x) - 0.4)
+    axis.set_ylim(bottom=0.0)
+    axis.grid(axis="y", color="#E5E5E5", linewidth=0.5)
+    axis.spines[["top", "right"]].set_visible(False)
+    axis.legend(
+        loc="upper left",
+        frameon=False,
+        fontsize=8,
+    )
+    fig.tight_layout()
+    return fig
 
 
 def _draw_ecdf(scores: pd.DataFrame, summary: pd.DataFrame) -> plt.Figure:
@@ -201,9 +256,9 @@ def _draw_ecdf(scores: pd.DataFrame, summary: pd.DataFrame) -> plt.Figure:
             fontsize=8,
         )
         axis.set_title(
-            "Content Stability Score"
+            "(A) Content Stability Score"
             if score_type == "css"
-            else "Style Stability Score"
+            else "(B) Style Stability Score"
         )
         axis.set_xlabel(score_type.upper())
         axis.set_ylim(0.0, 1.0)
@@ -230,7 +285,9 @@ def _validate_analysis_run(path: Path) -> dict[str, object]:
     return run
 
 
-def _validate_tables(scores: pd.DataFrame, summary: pd.DataFrame) -> None:
+def _validate_tables(
+    scores: pd.DataFrame, summary: pd.DataFrame, counts: pd.DataFrame
+) -> None:
     score_columns = {
         "score_type",
         "aggregation",
@@ -245,10 +302,22 @@ def _validate_tables(scores: pd.DataFrame, summary: pd.DataFrame) -> None:
         "ci_low",
         "ci_high",
     }
+    count_columns = {
+        "layer",
+        "channel_count",
+        "css_kept_count",
+        "sss_kept_count",
+        "shared_count",
+        "css_exclusive_count",
+        "sss_exclusive_count",
+        "union_count",
+    }
     if not score_columns.issubset(scores.columns):
         raise ValueError("exclusive_channel_scores.csv has an invalid schema")
     if not summary_columns.issubset(summary.columns):
         raise ValueError("exclusive_channel_summary.csv has an invalid schema")
+    if not count_columns.issubset(counts.columns):
+        raise ValueError("exclusive_channel_counts.csv has an invalid schema")
     if set(scores["score_type"]) != {"css", "sss"}:
         raise ValueError("score table must contain CSS and SSS")
     if set(scores["channel_set"]) != set(CHANNEL_COLORS):
@@ -258,6 +327,34 @@ def _validate_tables(scores: pd.DataFrame, summary: pd.DataFrame) -> None:
     numeric = scores["score"].to_numpy(dtype=float)
     if not len(numeric) or not np.isfinite(numeric).all():
         raise ValueError("score table contains invalid values")
+    if counts["layer"].tolist() != list(VGG19_CONV_LAYER_NAMES):
+        raise ValueError("count table must contain the ordered VGG19 convolutions")
+    count_names = sorted(count_columns.difference({"layer"}))
+    count_values = counts[count_names].to_numpy(dtype=float)
+    if (
+        not np.isfinite(count_values).all()
+        or np.any(count_values < 0)
+        or not np.equal(count_values, np.floor(count_values)).all()
+    ):
+        raise ValueError("count table contains invalid channel counts")
+    if not counts["css_kept_count"].equals(counts["sss_kept_count"]):
+        raise ValueError("CSS and SSS retained counts must match within each layer")
+    if not (counts["shared_count"] + counts["css_exclusive_count"]).equals(
+        counts["css_kept_count"]
+    ):
+        raise ValueError("CSS layer counts are inconsistent")
+    if not (counts["shared_count"] + counts["sss_exclusive_count"]).equals(
+        counts["sss_kept_count"]
+    ):
+        raise ValueError("SSS layer counts are inconsistent")
+    if not (
+        counts["shared_count"]
+        + counts["css_exclusive_count"]
+        + counts["sss_exclusive_count"]
+    ).equals(counts["union_count"]):
+        raise ValueError("union layer counts are inconsistent")
+    if (counts["union_count"] > counts["channel_count"]).any():
+        raise ValueError("union counts exceed available channels")
 
 
 def _output_record(

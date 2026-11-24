@@ -280,6 +280,7 @@ def analyze_exclusive_channels(
         results_root=results_root,
         run_id=run_id,
         timestamp=started,
+        lightweight_kind="analysis",
     )
     log_path = run_root / "run.log"
     _append_log_line(log_path, "INFO", "starting exclusive-channel analysis")
