@@ -31,6 +31,8 @@ from content_style_stability.core.usecases.train_model import (
 from content_style_stability.models import create_model
 from content_style_stability.trainers import create_trainer
 
+from ._model_results import models_from_results_csv as _models_from_results_csv
+
 _DATASET_TRAINERS = {
     "imagenet": "imagenet_trainer",
     "imagenet_stylized": "imagenet_stylized_trainer",
@@ -41,7 +43,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Train one or more models on one ImageFolder dataset."
     )
-    parser.add_argument("--model", "--models", dest="models", nargs="+", required=True)
+    model_group = parser.add_mutually_exclusive_group(required=True)
+    model_group.add_argument("--model", "--models", dest="models", nargs="+")
+    model_group.add_argument(
+        "--models-from-results",
+        type=Path,
+        help="Load checkpoint paths from a pruning results.csv file.",
+    )
     parser.add_argument("--dataset", choices=tuple(_DATASET_TRAINERS), required=True)
     parser.add_argument("--data-path", type=Path)
     parser.add_argument("--epochs", type=int, default=DEFAULT_TRAIN_EPOCHS)
@@ -129,6 +137,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     try:
         args = parser.parse_args(argv)
+        if args.models_from_results is not None:
+            args.models = _models_from_results_csv(args.models_from_results)
         _validate(args)
         configure_logging(verbose=args.verbose, debug=args.debug)
         paths = get_paths()
