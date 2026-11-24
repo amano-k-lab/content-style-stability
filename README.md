@@ -28,7 +28,7 @@ flowchart LR
 
 ## Requirements
 
-- Python 3.11 or later
+- Python 3.12
 - [uv](https://docs.astral.sh/uv/) for dependency and virtual-environment management
 
 Install the locked dependencies:
