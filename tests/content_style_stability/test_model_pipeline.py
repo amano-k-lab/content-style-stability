@@ -165,6 +165,32 @@ def test_training_selects_best_epoch_from_validation_metrics(tmp_path: Path) -> 
     assert best_checkpoint_path.is_file()
 
 
+def test_validation_loader_does_not_advance_global_torch_rng(tmp_path: Path) -> None:
+    train_root = tmp_path / "train"
+    validation_root = tmp_path / "validation"
+    _write_tiny_imagefolder(train_root)
+    _write_tiny_imagefolder(validation_root)
+    trainer = ImageFolderTrainer(
+        _TinyModel(),
+        train_root,
+        epochs=1,
+        batch_size=2,
+        num_workers=0,
+        save_dir=tmp_path / "checkpoints",
+        validation_data_paths={"validation": validation_root},
+        selection_dataset="validation",
+    )
+    loaders = trainer._build_validation_loaders(training_class_to_idx={"a": 0, "b": 1})
+
+    torch.manual_seed(123)
+    expected_next = torch.rand(1)
+    torch.manual_seed(123)
+    trainer._evaluate_accuracy(loaders["validation"])
+    actual_next = torch.rand(1)
+
+    assert torch.equal(actual_next, expected_next)
+
+
 def test_evaluation_writes_long_csv_and_no_figures(tmp_path: Path) -> None:
     result = run_evaluation(
         RunEvaluationRequest(

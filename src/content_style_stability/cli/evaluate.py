@@ -21,6 +21,8 @@ from content_style_stability.core.usecases.run_evaluation import (
 from content_style_stability.evaluators import create_evaluator
 from content_style_stability.models import create_model
 
+from ._model_results import models_from_results_csv
+
 _DATASET_EVALUATORS = {
     "imagenet": ("imagenet_accuracy",),
     "imagenet_stylized": ("imagenet_stylized_accuracy",),
@@ -37,7 +39,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Evaluate one or more models on one dataset and write CSV results."
     )
-    parser.add_argument("--model", "--models", dest="models", nargs="+", required=True)
+    model_group = parser.add_mutually_exclusive_group(required=True)
+    model_group.add_argument("--model", "--models", dest="models", nargs="+")
+    model_group.add_argument(
+        "--models-from-results",
+        type=Path,
+        help="Load checkpoint paths from a training results.csv file.",
+    )
     parser.add_argument("--dataset", choices=tuple(_DATASET_EVALUATORS), required=True)
     parser.add_argument("--data-path", type=Path)
     parser.add_argument("--human-data-path", type=Path)
@@ -84,6 +92,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         effective_argv = list(sys.argv[1:] if argv is None else argv)
         args = parser.parse_args(effective_argv)
+        if args.models_from_results is not None:
+            args.models = models_from_results_csv(args.models_from_results)
         configure_logging(verbose=args.verbose, debug=args.debug)
         if args.batch_size <= 0:
             raise ValueError("--batch-size must be > 0")

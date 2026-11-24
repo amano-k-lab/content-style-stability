@@ -869,12 +869,18 @@ class ImageFolderTrainer(TrainerPort):
                 raise ValueError(
                     f"Validation classes do not match training classes ({name}): {path}"
                 )
+            # Even a non-shuffled DataLoader draws a worker base seed when its
+            # iterator is created. Keep validation off the global torch RNG so
+            # per-epoch evaluation cannot change the next training shuffle.
+            validation_generator = torch.Generator()
+            validation_generator.manual_seed(0)
             loaders[name] = DataLoader(
                 dataset,
                 batch_size=self.batch_size,
                 shuffle=False,
                 num_workers=self.num_workers,
                 pin_memory=(self._device.type == "cuda"),
+                generator=validation_generator,
             )
         return loaders
 
