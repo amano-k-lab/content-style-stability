@@ -49,8 +49,6 @@ REQUIRED_ANALYSIS_FILES = (
     "auc_point_estimates.csv",
     "auc_bootstrap_replicates.csv",
     "css_sss_tests.csv",
-    "aggregation_pairwise_tests.csv",
-    "aggregation_auc_table.csv",
 )
 METRIC_TITLES = {
     "ImageNet Top-1 Accuracy": "ImageNet accuracy",
@@ -61,9 +59,6 @@ METRIC_TITLES = {
     "Shape Bias": "Shape bias",
 }
 SCORE_COLORS = {"css": "#2166AC", "sss": "#D6604D"}
-AGGREGATION_COLORS = dict(
-    zip(AGGREGATIONS, ("#2166AC", "#67A9CF", "#1B7837", "#D6604D", "#762A83"))
-)
 APPENDIX_ARCHITECTURES = {
     "alexnet": {"label": "AlexNet", "paper_figure": 9},
     "vgg19": {"label": "VGG-19", "paper_figure": 10},
@@ -146,6 +141,7 @@ def make_model_evaluation_figures(
         results_root=results_root,
         run_id=run_id,
         timestamp=started,
+        lightweight_kind="figures",
     )
     log_path = run_root / "run.log"
     _append_log_line(log_path, "INFO", "starting model evaluation figures")
@@ -162,8 +158,7 @@ def make_model_evaluation_figures(
         points = pd.read_csv(analysis_run / "auc_point_estimates.csv")
         replicates = pd.read_csv(analysis_run / "auc_bootstrap_replicates.csv")
         tests = pd.read_csv(analysis_run / "css_sss_tests.csv")
-        aggregation_tests = pd.read_csv(analysis_run / "aggregation_pairwise_tests.csv")
-        _validate_tables(curves, points, replicates, tests, aggregation_tests)
+        _validate_tables(curves, points, replicates, tests)
         figures: list[tuple[str, plt.Figure]] = []
         architectures = _ordered_architectures(curves)
         appendix_figures = _appendix_figure_metadata(curves, architectures)
@@ -180,7 +175,6 @@ def make_model_evaluation_figures(
                     "css_sss_auc_zoomed",
                     _draw_css_sss_auc(points, replicates, tests, zoomed=True),
                 ),
-                ("aggregation_auc", _draw_aggregation_auc(points, aggregation_tests)),
             ]
         )
         for stem, figure in figures:
@@ -341,9 +335,9 @@ def _draw_pruning_overview(curves: pd.DataFrame, architecture: str) -> plt.Figur
         ncol=len(AGGREGATIONS),
         frameon=False,
         fontsize=8,
-        bbox_to_anchor=(0.5, 0.005),
+        bbox_to_anchor=(0.5, 0.025),
     )
-    fig.supxlabel("Pruning rate (%)", fontsize=8, y=0.05)
+    fig.supxlabel("Pruning rate (%)", fontsize=8, y=0.085)
     fig.tight_layout(rect=(0.03, 0.075, 0.995, 0.93), h_pad=0.5, w_pad=0.35)
     _add_appendix_stage_headers(fig, columns)
     return fig
@@ -545,56 +539,6 @@ def _draw_css_sss_auc(
     return fig
 
 
-def _draw_aggregation_auc(
-    points: pd.DataFrame, aggregation_tests: pd.DataFrame
-) -> plt.Figure:
-    subset = points.loc[
-        points["architecture"].eq(MAIN_ARCHITECTURE)
-        & points["checkpoint_stage"].eq(MAIN_STAGE)
-        & points["summary_level"].eq("aggregation")
-    ]
-    fig, axes = plt.subplots(2, 3, figsize=(10.0, 6.1))
-    offsets = {"css": -0.13, "sss": 0.13}
-    for axis, metric in zip(axes.flat, METRICS, strict=True):
-        panel = subset.loc[subset["metric"].eq(metric)]
-        for score in SCORE_TYPES:
-            ordered = (
-                panel.loc[panel["score_type"].eq(score)]
-                .set_index("aggregation")
-                .loc[list(AGGREGATIONS)]
-            )
-            x = np.arange(len(AGGREGATIONS), dtype=float) + offsets[score]
-            values = ordered["auc"].to_numpy(float)
-            low = ordered["ci95_low"].to_numpy(float)
-            high = ordered["ci95_high"].to_numpy(float)
-            axis.vlines(x, low, high, color=SCORE_COLORS[score], linewidth=1.2)
-            axis.plot(
-                x,
-                values,
-                "o",
-                color=SCORE_COLORS[score],
-                markerfacecolor="white",
-                label=score.upper(),
-            )
-        significant = aggregation_tests.loc[
-            aggregation_tests["metric"].eq(metric)
-            & aggregation_tests["significant"].astype(str).str.lower().eq("true")
-        ]
-        direction = "↑" if HIGHER_IS_BETTER[metric] else "↓"
-        axis.set_title(
-            f"{METRIC_TITLES[metric]} {direction}\n{len(significant)}/20 corrected comparisons",
-            fontsize=9,
-        )
-        axis.set_xticks(range(len(AGGREGATIONS)), AGGREGATIONS, rotation=25, ha="right")
-        axis.set_ylabel("Normalized AUC")
-        axis.grid(axis="y", color="#E5E5E5", linewidth=0.5)
-        axis.spines[["top", "right"]].set_visible(False)
-    handles, labels = axes[0, 0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="upper center", ncol=2, frameon=False)
-    fig.tight_layout(rect=(0, 0, 1, 0.96))
-    return fig
-
-
 def _validate_analysis_run(path: Path) -> dict[str, object]:
     if not path.is_dir():
         raise FileNotFoundError(f"analysis run not found: {path}")
@@ -618,7 +562,6 @@ def _validate_tables(
     points: pd.DataFrame,
     replicates: pd.DataFrame,
     tests: pd.DataFrame,
-    aggregation_tests: pd.DataFrame,
 ) -> None:
     requirements = (
         (
@@ -659,7 +602,6 @@ def _validate_tables(
             },
         ),
         (tests, {"metric", "p_value_corrected"}),
-        (aggregation_tests, {"metric", "significant"}),
     )
     for frame, required in requirements:
         missing = sorted(required - set(frame.columns))
