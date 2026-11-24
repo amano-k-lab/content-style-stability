@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pandas as pd
 import pytest
@@ -17,6 +18,7 @@ from content_style_stability.analysis.behavior import (
     run_behavior_analysis,
     split_valid_trials,
 )
+from content_style_stability.cli import analyze_behavior as analyze_behavior_cli
 from content_style_stability.cli.figure_behavior import build_parser
 from content_style_stability.utils.io import write_run_json
 from figure.behavior import make_behavior_figures
@@ -246,6 +248,8 @@ def test_analysis_and_figure_clis_write_tracked_artifacts(
         argv=["--runs-root", str(runs_root)],
     )
     assert analysis.status == "success"
+    assert analysis.run_root.parent.parent.name == "analysis"
+    assert analysis.run_root.parent.name == "behavior_analysis"
     analysis_run = json.loads((analysis.run_root / "run.json").read_text())
     assert analysis_run["metrics"]["participant_count"] == 10
     assert analysis_run["metrics"]["valid_trial_count"] == 5000
@@ -258,6 +262,8 @@ def test_analysis_and_figure_clis_write_tracked_artifacts(
         dpi=72,
     )
     assert figures.status == "success"
+    assert figures.run_root.parent.parent.name == "figures"
+    assert figures.run_root.parent.name == "behavior_figures"
     assert len(figures.figure_paths) == 3
     assert {path.suffix for path in figures.figure_paths} == {".pdf"}
     assert {path.name for path in figures.figure_paths} == {
@@ -293,3 +299,32 @@ def test_figure_cli_accepts_optional_png_and_svg() -> None:
     )
     assert args.png
     assert args.svg
+
+
+def test_behavior_analysis_cli_uses_project_results_root_by_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project_results = tmp_path / "results"
+    behavior_results = tmp_path / "experiment" / "results"
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        analyze_behavior_cli,
+        "get_paths",
+        lambda: SimpleNamespace(results_root=project_results),
+    )
+    monkeypatch.setattr(
+        analyze_behavior_cli,
+        "get_behavior_results_root",
+        lambda _paths: behavior_results,
+    )
+
+    def fake_analysis(**kwargs: object) -> SimpleNamespace:
+        captured.update(kwargs)
+        return SimpleNamespace(status="success", run_root=project_results / "run")
+
+    monkeypatch.setattr(analyze_behavior_cli, "run_behavior_analysis", fake_analysis)
+
+    assert analyze_behavior_cli.main([]) == 0
+    assert captured["runs_root"] == behavior_results / "runs" / "behavior_experiment"
+    assert captured["results_root"] == project_results

@@ -533,7 +533,11 @@ def run_behavior_analysis(
     started = datetime.now(UTC)
     run_id = uuid4().hex[:8]
     run_root = create_run_directory(
-        "behavior_analysis", results_root=results_root, run_id=run_id, timestamp=started
+        "behavior_analysis",
+        results_root=results_root,
+        run_id=run_id,
+        timestamp=started,
+        lightweight_kind="analysis",
     )
     log_path = run_root / "run.log"
     _append_log_line(log_path, "INFO", "starting behavior analysis")

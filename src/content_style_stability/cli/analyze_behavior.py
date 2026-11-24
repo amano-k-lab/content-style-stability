@@ -33,7 +33,7 @@ def main(argv: list[str] | None = None) -> int:
         result = run_behavior_analysis(
             runs_root=args.runs_root
             or behavior_results_root / "runs" / "behavior_experiment",
-            results_root=args.output_root or behavior_results_root,
+            results_root=args.output_root or paths.results_root,
             argv=effective_argv,
             allow_response_only_runs=args.allow_response_only_runs,
         )

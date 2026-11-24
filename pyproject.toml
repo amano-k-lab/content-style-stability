@@ -71,5 +71,6 @@ content-style-stability-figure-behavior = "content_style_stability.cli.figure_be
 content-style-stability-convert-model-evaluation = "content_style_stability.cli.convert_model_evaluation:main"
 content-style-stability-analyze-model-evaluation = "content_style_stability.cli.analyze_model_evaluation:main"
 content-style-stability-figure-model-evaluation = "content_style_stability.cli.figure_model_evaluation:main"
+content-style-stability-figure-base-model-performance = "content_style_stability.cli.figure_base_model_performance:main"
 content-style-stability-analyze-exclusive-channels = "content_style_stability.cli.analyze_exclusive_channels:main"
 content-style-stability-figure-exclusive-channels = "content_style_stability.cli.figure_exclusive_channels:main"

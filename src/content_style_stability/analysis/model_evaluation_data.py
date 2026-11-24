@@ -36,6 +36,10 @@ _AGGREGATION_PATTERN = re.compile(
     re.IGNORECASE,
 )
 _PRUNING_PATTERN = re.compile(r"(?:^|[_/\\-])pr(\d{1,3})pct(?:[_./\\-]|$)", re.I)
+_CURRENT_FINETUNED_PATTERN = re.compile(
+    r"__imagenet_trainer[/\\](?:last|best|epoch[_-]?\d+)\.(?:pt|pth)$",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -94,6 +98,7 @@ def parse_condition_identity(value: str) -> ConditionIdentity:
         re.search(r"imagenettrainer[_-]?epoch\d+", lowered)
         or re.search(r"imagenet_trainer[/\\].*epoch[_-]?\d+", lowered)
         or re.search(r"__imagenet_trainer[/\\].*epoch[_-]?\d+", lowered)
+        or _CURRENT_FINETUNED_PATTERN.search(lowered)
     )
     return ConditionIdentity(
         architecture=architecture,

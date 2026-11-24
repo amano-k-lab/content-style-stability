@@ -6,7 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from content_style_stability.config.paths import get_behavior_results_root, get_paths
+from content_style_stability.config.paths import get_paths
 from figure.behavior import make_behavior_figures
 
 
@@ -37,7 +37,7 @@ def main(argv: list[str] | None = None) -> int:
         paths = get_paths()
         result = make_behavior_figures(
             analysis_run=args.analysis_run,
-            results_root=args.output_root or get_behavior_results_root(paths),
+            results_root=args.output_root or paths.results_root,
             argv=effective_argv,
             dpi=args.dpi,
             include_png=args.png,

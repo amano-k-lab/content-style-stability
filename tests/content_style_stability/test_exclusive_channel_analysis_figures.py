@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import pickle
 from pathlib import Path
 
@@ -126,6 +127,8 @@ def test_analysis_and_ecdf_figure_end_to_end(tmp_path: Path) -> None:
     )
 
     assert analysis.status == "success"
+    assert analysis.run_root.parent.parent.name == "analysis"
+    assert analysis.run_root.parent.name == "exclusive_channel_analysis"
     summary = pd.read_csv(analysis.artifact_paths["exclusive_channel_summary.csv"])
     assert set(summary["aggregation"]) == {"average", "min"}
     figures = make_exclusive_channel_figures(
@@ -134,8 +137,17 @@ def test_analysis_and_ecdf_figure_end_to_end(tmp_path: Path) -> None:
         include_png=True,
     )
     assert figures.status == "success"
+    assert figures.run_root.parent.parent.name == "figures"
+    assert figures.run_root.parent.name == "exclusive_channel_figures"
     assert {path.suffix for path in figures.figure_paths} == {".pdf", ".png"}
+    assert {path.stem for path in figures.figure_paths} == {
+        "exclusive_channel_masks",
+        "exclusive_channel_ecdf",
+    }
     assert all(path.is_file() for path in figures.figure_paths)
+    with (figures.run_root / "run.json").open(encoding="utf-8") as handle:
+        run = json.load(handle)
+    assert run["metrics"]["figure_count"] == 2
 
 
 def test_raw_score_rejects_identity_and_shape_mismatches(tmp_path: Path) -> None:

@@ -2,30 +2,6 @@
 
 This repository implements the experimental pipeline described in *Subspace Image Synthesis for Style-Invariant Object Recognition*. It uses controlled image sets to compute channel-wise Content and Style Stability Scores, constructs and fine-tunes pruned CNN submodels, and evaluates them through object recognition, image synthesis, and human judgments.
 
-## Pipeline
-
-```mermaid
-flowchart LR
-    A[ImageNet + WikiArt] --> B[Stylized ImageNet]
-    B --> C[Fine-tuned model]
-    C --> D1[CSS]
-    C --> D2[SSS]
-    D1 --> E1[CSS-based submodel]
-    D2 --> E2[SSS-based submodel]
-    E1 --> T1[Fine-tuned CSS-based submodel]
-    E2 --> T2[Fine-tuned SSS-based submodel]
-    T1 --> H[Recognition benchmarks]
-    T2 --> H
-    T1 --> F[Matched image synthesis]
-    T2 --> F
-    F --> G[Human 2AFC evaluation]
-```
-
-| Score | Held constant | Varied | Target representation |
-| --- | --- | --- | --- |
-| CSS | Object content | Visual style | Content stable across styles |
-| SSS | Visual style | Object content | Style stable across contents |
-
 ## Requirements
 
 - Python 3.12
@@ -184,41 +160,18 @@ The default configuration reproduces the `proj_metamer_cornet` protocol: it uses
 
 ## 5. Analysis
 
-### Behavioral responses and figures
+All analysis commands write their runs below `results/runs/analysis/`. All figure commands write their runs below `results/runs/figures/`.
 
-Fit the paper's behavioral GLMM and statistical tests, then generate Figures 7, 17, and 18 from the resulting CSV files:
+### Base-model performance
 
-```bash
-analysis_run="$(uv run content-style-stability-analyze-behavior)"
-
-uv run content-style-stability-figure-behavior \
-  --analysis-run "$analysis_run"
-```
-
-Analysis outputs are saved below `experiment/results/runs/behavior_analysis/`; PDF figures are saved below `experiment/results/runs/behavior_figures/`. Add `--png` and/or `--svg` to create those formats as well.
-
-### Model evaluations and figures
-
-Analyze the sample-level prediction tables produced in step 2, then create the pruning-curve and normalized-AUC figures:
+After fine-tuning, create the three-panel object-recognition figure from the per-epoch metrics:
 
 ```bash
-evaluation_root="results/runs/evaluate"
-
-model_analysis_run="$(uv run content-style-stability-analyze-model-evaluation \
-  --evaluation-root "$evaluation_root")"
-
-uv run content-style-stability-figure-model-evaluation \
-  --analysis-run "$model_analysis_run"
+uv run content-style-stability-figure-base-model-performance \
+  --train-run results/runs/train/REPLACE_WITH_RUN_ID
 ```
 
-The analysis uses 1,000 shared bootstrap resamples by default. PDF figures are written below `results/runs/model_evaluation_figures/`; add `--png` and/or `--svg` for additional formats. When both pre- and post-fine-tuning evaluation grids are available, the figure run also writes the architecture-specific 6-by-4 pruning-curve grids used for Appendix Figures 9--12 (AlexNet, VGG-19, ResNet-50, and CORnet-S).
-
-For prediction tables created by the previous project, first create a canonical copy and pass the printed run directory to the analysis command:
-
-```bash
-evaluation_root="$(uv run content-style-stability-convert-model-evaluation \
-  --input-run <legacy-evaluation-run>)"
-```
+Repeat `--train-run` when architectures were trained in separate runs. The command plots whichever of AlexNet, VGG-19, ResNet-50, and CORnet-S are available, so a VGG-19-only run is also supported. It writes `base_model_object_recognition.pdf` below `results/runs/figures/base_model_performance_figures/`.
 
 ### Exclusive-channel stability distributions
 
@@ -235,7 +188,36 @@ uv run content-style-stability-figure-exclusive-channels \
   --analysis-run "$exclusive_analysis_run"
 ```
 
-The analysis aggregates CSS with the mean and SSS with the minimum, matching the selected submodels. It uses 200 stimulus-group bootstrap replicates by default. Within each score type, every replicate shares the same resampled groups across the CSS-exclusive and SSS-exclusive channel sets. CSV artifacts are written below `results/runs/exclusive_channel_analysis/`, and the ECDF PDF is written below `results/runs/exclusive_channel_figures/`.
+The analysis aggregates CSS with the mean and SSS with the minimum, matching the selected submodels. It uses 200 stimulus-group bootstrap replicates by default. Within each score type, every replicate shares the same resampled groups across the CSS-exclusive and SSS-exclusive channel sets. CSV artifacts are written below `results/runs/analysis/exclusive_channel_analysis/`. The figure run writes `exclusive_channel_masks.pdf` for the layer-wise shared/exclusive channel counts and `exclusive_channel_ecdf.pdf` for the response-stability distributions below `results/runs/figures/exclusive_channel_figures/`.
+
+### Model evaluations and figures
+
+Analyze the sample-level prediction tables produced in step 2, then create the pruning-curve and normalized-AUC figures:
+
+```bash
+evaluation_root="results/runs/evaluate"
+
+model_analysis_run="$(uv run content-style-stability-analyze-model-evaluation \
+  --evaluation-root "$evaluation_root")"
+
+uv run content-style-stability-figure-model-evaluation \
+  --analysis-run "$model_analysis_run"
+```
+
+The analysis uses 1,000 shared bootstrap resamples by default. Analysis CSVs are written below `results/runs/analysis/model_evaluation_analysis/`. PDF figures are written below `results/runs/figures/model_evaluation_figures/`; add `--png` and/or `--svg` for additional formats. When both pre- and post-fine-tuning evaluation grids are available, the figure run also writes the architecture-specific 6-by-4 pruning-curve grids used for Appendix Figures 9--12 (AlexNet, VGG-19, ResNet-50, and CORnet-S).
+
+### Behavioral responses and figures
+
+Fit the paper's behavioral GLMM and statistical tests, then generate Figures 7, 17, and 18 from the resulting CSV files:
+
+```bash
+analysis_run="$(uv run content-style-stability-analyze-behavior)"
+
+uv run content-style-stability-figure-behavior \
+  --analysis-run "$analysis_run"
+```
+
+Analysis outputs are saved below `results/runs/analysis/behavior_analysis/`; PDF figures are saved below `results/runs/figures/behavior_figures/`. The source experiment responses remain below `experiment/results/runs/behavior_experiment/`. Add `--png` and/or `--svg` to create those formats as well.
 
 ## 6. Behavioral-response data
 

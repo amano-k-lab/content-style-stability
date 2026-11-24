@@ -40,6 +40,17 @@ def test_parse_current_and_legacy_checkpoint_identities() -> None:
     assert current.aggregation == "average"
     assert current.pruning_rate == 0.3
 
+    current_finetuned = parse_condition_identity(
+        "/models/train/run/vgg19_best_pruned_score__scores__model__"
+        "content_constant__cosine_similarity_average_skip_first_pr030pct__"
+        "imagenet_trainer/last.pt"
+    )
+    assert current_finetuned.architecture == "vgg19"
+    assert current_finetuned.checkpoint_stage == "finetuned"
+    assert current_finetuned.score_type == "css"
+    assert current_finetuned.aggregation == "average"
+    assert current_finetuned.pruning_rate == 0.3
+
     legacy = parse_condition_identity(
         "/models/resnet50_score__StyleFixedDataset__cosine_similarity_entropy_"
         "skip_first_pr100pct_ImageNetTrainer_epoch001.pt"
@@ -271,6 +282,8 @@ def test_analysis_and_figure_end_to_end_with_synthetic_predictions(
         },
     )
     assert result.status == "success"
+    assert result.run_root.parent.parent.name == "analysis"
+    assert result.run_root.parent.name == "model_evaluation_analysis"
     for filename in (
         "coverage.csv",
         "pruning_curve_points.csv",
@@ -299,6 +312,8 @@ def test_analysis_and_figure_end_to_end_with_synthetic_predictions(
         results_root=tmp_path / "results",
     )
     assert figures.status == "success"
+    assert figures.run_root.parent.parent.name == "figures"
+    assert figures.run_root.parent.name == "model_evaluation_figures"
     assert {path.suffix for path in figures.figure_paths} == {".pdf"}
     assert {path.stem for path in figures.figure_paths} == {
         "pruning_curves_alexnet",
@@ -307,8 +322,8 @@ def test_analysis_and_figure_end_to_end_with_synthetic_predictions(
         "pruning_curves_cornet_s",
         "css_sss_auc",
         "css_sss_auc_zoomed",
-        "aggregation_auc",
     }
+    assert not (figures.run_root / "aggregation_auc.pdf").exists()
     with (figures.run_root / "figure_metadata.json").open(encoding="utf-8") as handle:
         metadata = json.load(handle)
     appendix = metadata["appendix_pruning_figures"]
